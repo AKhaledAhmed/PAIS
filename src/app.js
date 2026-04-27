@@ -5,6 +5,7 @@ const cors     = require("cors");
 const helmet   = require("helmet");
 const morgan   = require("morgan");
 // ── Basic Route ───────────────────────────────────────────────
+const app = express();
 app.get("/", (req, res) => {
   res.status(200).json({ success: true, message: "PAIS API is running!" });
 });
