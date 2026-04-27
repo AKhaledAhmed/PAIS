@@ -8,7 +8,7 @@ const { signAccessToken, signRefreshToken, verifyRefreshToken } = require("../ut
 // ─────────────────────────────────────────────────────────────
 const registerClient = async (req, res) => {
     try {
-        const {firstName, lastName, email, phone, age, gender, password, acceptedTerms } = req.body;
+        const {firstName, lastName, email, phone, dateOfBirth, gender, password, acceptedTerms } = req.body;
 
     // ── Duplicate email check ──────────────────────────────
     const existing = await Client.findOne({ email });
@@ -25,7 +25,7 @@ const registerClient = async (req, res) => {
       lastName,
       email,
       phone,
-      age: Number(age),
+      dateOfBirth: new Date(dateOfBirth),// Ensure it's stored as a Date object
       gender: gender === true || gender === "true",
       password,
       acceptedTerms: acceptedTerms === true || acceptedTerms === "true",

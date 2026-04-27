@@ -36,9 +36,18 @@ const clientRegisterRules = [
     .notEmpty().withMessage("Phone number is required")
     .matches(/^\+?[0-9\s\-().]{7,20}$/).withMessage("Must be a valid phone number"),
 
-  body("age")
-    .notEmpty().withMessage("Age is required")
-    .isInt({ min: 1, max: 120 }).withMessage("Age must be between 1 and 120"),
+  body("dateOfBirth")
+    .notEmpty().withMessage("Date of birth is required")
+    .isDate().withMessage("Must be a valid date")
+    .custom((value) => {
+      const birthDate = new Date(value);
+      const today = new Date();
+      const age = today.getFullYear() - birthDate.getFullYear();
+      if (age < 0 || age > 120) {
+        throw new Error("Age must be between 0 and 120");
+      }
+      return true;
+    }),// Custom validation to ensure date is valid and age is reasonable in the form of YYYY-MM-DD
 
   body("gender")
     .notEmpty().withMessage("Gender is required")
