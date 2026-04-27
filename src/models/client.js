@@ -26,7 +26,7 @@ const clientSchema = new mongoose.Schema(
       required: [true, "Phone number is required"],
       trim: true,
     },
-    age: {
+    dateOfBirth: {
       type: Date,
       required: [true, "Date of Birth is required"],
       //min: [1, "Age must be a positive number"],
