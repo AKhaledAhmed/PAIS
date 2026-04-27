@@ -9,8 +9,15 @@ from dotenv import load_dotenv
 from sentence_transformers import util
 import torch
 
+import os
+from pathlib import Path
+
+# This tells Python to look 2 folders up for the .env file
+env_path = Path(__file__).resolve().parent.parent.parent / '.env'
+
+
 # Load environment variables from .env file
-load_dotenv()
+load_dotenv(dotenv_path=env_path)
 
 app = FastAPI()
 
