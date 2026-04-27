@@ -4,12 +4,7 @@ const mongoose = require("mongoose");
 const cors     = require("cors");
 const helmet   = require("helmet");
 const morgan   = require("morgan");
-// ── Basic Route ───────────────────────────────────────────────
-const app = express();
-app.get("/", (req, res) => {
-  res.status(200).json({ success: true, message: "PAIS API is running!" });
-});
-app.use(helmet());
+
 // ── Controllers ──────────────────────────────────────────────
 const {
   registerClient,
@@ -78,6 +73,10 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 if (process.env.NODE_ENV !== "production") app.use(morgan("dev"));
 
+// ── Basic Route ───────────────────────────────────────────────
+app.get("/", (req, res) => {
+  res.status(200).json({ success: true, message: "PAIS API is running!" });
+});
 // ────────────────────────────────────────────────────────────
 // AUTH ROUTES (Client, Pharmacy, Admin)
 // ────────────────────────────────────────────────────────────
