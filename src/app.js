@@ -77,56 +77,73 @@ if (process.env.NODE_ENV !== "production") app.use(morgan("dev"));
 app.get("/", (req, res) => {
   res.status(200).json({ success: true, message: "PAIS API is running!" });
 });
+
 // ────────────────────────────────────────────────────────────
 // AUTH ROUTES (Client, Pharmacy, Admin)
 // ────────────────────────────────────────────────────────────
 app.post("/api/client/register", clientRegisterRules, validate, registerClient);
 app.post("/api/client/login",    clientLoginRules,    validate, loginClient);
-app.get( "/api/client/me",      protect, getClientMe);
+app.get( "/api/client/me",       protect, getClientMe);
 
 app.post("/api/pharmacy/register", pharmacyRegisterRules, validate, registerPharmacy);
 app.post("/api/pharmacy/login",    pharmacyLoginRules,    validate, loginPharmacy);
-app.get( "/api/pharmacy/me",      protect, restrictTo("pharmacy"), getPharmacyMe);
+app.get( "/api/pharmacy/me",       protect, restrictTo("pharmacy"), getPharmacyMe);
 
 app.post("/api/admin/login",   loginAdmin);
 app.get( "/api/admin/me",      protect, restrictTo("admin"), getAdminMe);
 
 // Shared / General Auth
-app.get( "/api/auth/me", protect, getClientMe); // Use ClientMe as the default
+app.get( "/api/auth/me",    protect, getClientMe);
 app.post("/api/auth/logout", logoutClient);
 
 // ────────────────────────────────────────────────────────────
 // SEARCH & AI
+// FIX: More-specific routes MUST come before /:drugId
+// or Express will swallow them as the :drugId param.
 // ────────────────────────────────────────────────────────────
-app.get("/api/search",                searchDrugs);               
-app.get("/api/search/nearby",         getNearbypharmacies);       
-app.get("/api/search/:drugId/nearby", getNearbyPharmaciesWithDrug); 
-app.get("/api/search/:drugId",        getDrugDetails);
-app.get("/api/search/:drugId/alternatives", getAlternatives);
+app.get("/api/search",                        searchDrugs);
+app.get("/api/search/nearby",                 getNearbypharmacies);
+app.get("/api/search/:drugId/nearby",         getNearbyPharmaciesWithDrug);  // ← specific first
+app.get("/api/search/:drugId/alternatives",   protect, getAlternatives);     // ← specific first + FIX: added protect
+app.get("/api/search/:drugId",                getDrugDetails);               // ← generic last
 
 // ────────────────────────────────────────────────────────────
-// MANAGEMENT (Inventory & Catalog)
+// DRUG MANAGEMENT (Admin)
+// FIX: Added missing GET /:id and PUT /:id routes that the
+// controller and service already implement but were never wired.
 // ────────────────────────────────────────────────────────────
-app.get(   "/api/drugs",        protect, restrictTo("admin"), getDrugs);
-app.post(  "/api/drugs",        protect, restrictTo("admin"), upsertDrug);
+app.get(   "/api/drugs",      protect, restrictTo("admin"), getDrugs);
+app.post(  "/api/drugs",      protect, restrictTo("admin"), upsertDrug);
+app.get(   "/api/drugs/:id",  protect, restrictTo("admin"), getSingleDrug);  // ← was missing
+app.put(   "/api/drugs/:id",  protect, restrictTo("admin"), upsertDrug);     // ← was missing
+app.delete("/api/drugs/:id",  protect, restrictTo("admin"), deleteDrug);
 
-app.get(   "/api/inventory",    protect, restrictTo("pharmacy"), getMyInventory);
+// ────────────────────────────────────────────────────────────
+// INVENTORY (Pharmacy)
+// ────────────────────────────────────────────────────────────
+app.get(   "/api/inventory",        protect, restrictTo("pharmacy"), getMyInventory);
 app.patch( "/api/inventory/update", protect, restrictTo("pharmacy"), updateItem);
 
 // ────────────────────────────────────────────────────────────
-// Error Handling & DB
+// Error Handling
 // ────────────────────────────────────────────────────────────
-app.use((req, res) => res.status(404).json({ success: false, message: "Route not found" }));
+app.use((req, res) =>
+  res.status(404).json({ success: false, message: "Route not found" })
+);
 
 app.use((err, req, res, next) => {
-  res.status(err.status || 500).json({ success: false, message: err.message || "Server Error" });
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || "Server Error",
+  });
 });
 
 mongoose.connect(process.env.MONGO_URI).then(() => {
   console.log("✅ MongoDB connected");
   const PORT = process.env.PORT || 5000;
-  app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server running on port ${PORT}`);});
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+  });
 });
 
 module.exports = app;
