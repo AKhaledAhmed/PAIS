@@ -61,7 +61,7 @@ const {
   clientLoginRules,
   pharmacyRegisterRules,
   pharmacyLoginRules,
-  refreshRules,
+  refreshRules, // Ensure this is imported for token routes
 } = require("./utils/validators");
 
 const app = express();
@@ -93,29 +93,30 @@ app.post("/api/admin/login",   loginAdmin);
 app.get( "/api/admin/me",      protect, restrictTo("admin"), getAdminMe);
 
 // Shared / General Auth
-app.get( "/api/auth/me",    protect, getClientMe);
-app.post("/api/auth/logout", logoutClient);
+app.get( "/api/auth/me",      protect, getClientMe);
+
+// EDITED: Added validation to logout to prevent crashes on undefined req.body
+app.post("/api/auth/logout",  refreshRules, validate, logoutClient);
+
+// EDITED: Added missing refresh token route
+app.post("/api/auth/refresh", refreshRules, validate, refreshAccessToken);
 
 // ────────────────────────────────────────────────────────────
 // SEARCH & AI
-// FIX: More-specific routes MUST come before /:drugId
-// or Express will swallow them as the :drugId param.
 // ────────────────────────────────────────────────────────────
 app.get("/api/search",                        searchDrugs);
 app.get("/api/search/nearby",                 getNearbypharmacies);
-app.get("/api/search/:drugId/nearby",         getNearbyPharmaciesWithDrug);  // ← specific first
-app.get("/api/search/:drugId/alternatives",   protect, getAlternatives);     // ← specific first + FIX: added protect
-app.get("/api/search/:drugId",                getDrugDetails);               // ← generic last
+app.get("/api/search/:drugId/nearby",         getNearbyPharmaciesWithDrug);
+app.get("/api/search/:drugId/alternatives",   protect, getAlternatives);
+app.get("/api/search/:drugId",                getDrugDetails);
 
 // ────────────────────────────────────────────────────────────
 // DRUG MANAGEMENT (Admin)
-// FIX: Added missing GET /:id and PUT /:id routes that the
-// controller and service already implement but were never wired.
 // ────────────────────────────────────────────────────────────
 app.get(   "/api/drugs",      protect, restrictTo("admin"), getDrugs);
 app.post(  "/api/drugs",      protect, restrictTo("admin"), upsertDrug);
-app.get(   "/api/drugs/:id",  protect, restrictTo("admin"), getSingleDrug);  // ← was missing
-app.put(   "/api/drugs/:id",  protect, restrictTo("admin"), upsertDrug);     // ← was missing
+app.get(   "/api/drugs/:id",  protect, restrictTo("admin"), getSingleDrug);
+app.put(   "/api/drugs/:id",  protect, restrictTo("admin"), upsertDrug);
 app.delete("/api/drugs/:id",  protect, restrictTo("admin"), deleteDrug);
 
 // ────────────────────────────────────────────────────────────

@@ -186,7 +186,8 @@ const loginAdmin = [
 // ── Refresh Token Rules ───────────────────────────────────
 const refreshRules = [
   body("refreshToken")
-    .notEmpty().withMessage("Refresh token is required"),
+    .notEmpty().withMessage("Refresh token is required")
+    .isString().withMessage("Refresh token must be a string"),
 ];
 
 module.exports = {
