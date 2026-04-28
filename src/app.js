@@ -49,6 +49,7 @@ const {
   updateItem
 } = require("./controllers/inventorycontroller");
 
+// RESTORED: Import the alternative controller
 const { getAlternatives } = require("./controllers/alternativecontroller");
 
 // ── Middleware ───────────────────────────────────────────────
@@ -61,7 +62,7 @@ const {
   clientLoginRules,
   pharmacyRegisterRules,
   pharmacyLoginRules,
-  refreshRules, // Ensure this is imported for token routes
+  refreshRules, 
 } = require("./utils/validators");
 
 const app = express();
@@ -94,21 +95,19 @@ app.get( "/api/admin/me",      protect, restrictTo("admin"), getAdminMe);
 
 // Shared / General Auth
 app.get( "/api/auth/me",      protect, getClientMe);
-
-// EDITED: Added validation to logout to prevent crashes on undefined req.body
 app.post("/api/auth/logout",  refreshRules, validate, logoutClient);
-
-// EDITED: Added missing refresh token route
 app.post("/api/auth/refresh", refreshRules, validate, refreshAccessToken);
 
 // ────────────────────────────────────────────────────────────
-// SEARCH & AI
+// SEARCH & AI (Client Facing)
 // ────────────────────────────────────────────────────────────
 app.get("/api/search",                        searchDrugs);
 app.get("/api/search/nearby",                 getNearbypharmacies);
 app.get("/api/search/:drugId/nearby",         getNearbyPharmaciesWithDrug);
-app.get("/api/search/:drugId/alternatives",   protect, getAlternatives);
 app.get("/api/search/:drugId",                getDrugDetails);
+
+// RESTORED: Route for clients to find alternative drugs
+app.get("/api/search/:drugId/alternatives",   protect, getAlternatives);
 
 // ────────────────────────────────────────────────────────────
 // DRUG MANAGEMENT (Admin)
@@ -122,8 +121,17 @@ app.delete("/api/drugs/:id",  protect, restrictTo("admin"), deleteDrug);
 // ────────────────────────────────────────────────────────────
 // INVENTORY (Pharmacy)
 // ────────────────────────────────────────────────────────────
-app.get(   "/api/inventory",        protect, restrictTo("pharmacy"), getMyInventory);
-app.patch( "/api/inventory/update", protect, restrictTo("pharmacy"), updateItem);
+// 1. Search the main catalog to find new drugs to add
+app.get( "/api/inventory/search-catalog", protect, restrictTo("pharmacy"), searchMasterCatalog);
+
+// 2. Get the pharmacy's entire current inventory
+app.get( "/api/inventory",                protect, restrictTo("pharmacy"), getMyInventory);
+
+// 3. Get a specific inventory item (to pre-fill the Edit form)
+app.get( "/api/inventory/item/:drugId",   protect, restrictTo("pharmacy"), getInventoryItem);
+
+// 4. Save / Update a drug in the inventory
+app.patch( "/api/inventory/update",       protect, restrictTo("pharmacy"), updateItem);
 
 // ────────────────────────────────────────────────────────────
 // Error Handling
