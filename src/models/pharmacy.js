@@ -2,7 +2,6 @@ const mongoose = require("mongoose");
 const { v4: uuidv4 } = require("uuid");
 const bcrypt = require("bcryptjs");
 
-
 const pharmacySchema = new mongoose.Schema(
   {
     // Auto-generated application reference ID
@@ -17,7 +16,7 @@ const pharmacySchema = new mongoose.Schema(
       required: [true, "Pharmacy name is required"],
       trim: true,
     },
-ownerName: {
+    ownerName: {
       type: String,
       required: [true, "Owner name is required"],
       trim: true,
@@ -28,7 +27,7 @@ ownerName: {
       required: [true, "Address is required"],
       trim: true,
     },
-location: {
+    location: {
       type: {
         type: String,
         enum: ["Point"],
@@ -79,7 +78,7 @@ location: {
       enum: ["pending", "approved", "rejected"],
       default: "pending",
     },
-        // Refresh tokens stored per device / session
+    // Refresh tokens stored per device / session
     refreshTokens: {
       type: [String],
       select: false,
@@ -91,28 +90,27 @@ location: {
   }
 );
 
-
-
 // Middleware to hash password before saving
-pharmacySchema.pre("save", async function (next) {
+// EDITED: Removed `next` argument as it is not used in Mongoose 5+ async hooks
+pharmacySchema.pre("save", async function () {
   // 1. Only run if password exists and was modified
   // This prevents errors during initial "Pending" registration where password is null
-  if (!this.password || !this.isModified("password")) return next();
+  if (!this.password || !this.isModified("password")) return;
 
   try {
     // 2. Security requirement: Use a strong algorithm like bcrypt 
     const salt = await bcrypt.genSalt(12);
     this.password = await bcrypt.hash(this.password, salt);
-    next();
   } catch (err) {
-    next(err);
+    // EDITED: Throw the error so Mongoose can catch it instead of using next(err)
+    throw err;
   }
 });
 
-
 // Enable 2dsphere index for distance-based ranking
 pharmacySchema.index({ location: "2dsphere" });
-// Helper method to check password during login [cite: 454]
+
+// Helper method to check password during login
 pharmacySchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
