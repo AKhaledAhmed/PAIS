@@ -13,6 +13,7 @@ const getAlternatives = async (req, res) => {
 
     // FIX: Parse topK from query string and forward it to the service.
     // Previously top_k was accepted by Python but never sent from Node.
+    // it must be have score more than 0.7 to be considered a valid alternative
     const topK = parseInt(req.query.topK, 10) || 5;
 
     if (!drugId) {
