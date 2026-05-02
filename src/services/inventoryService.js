@@ -1,9 +1,11 @@
 const Inventory = require("../models/inventory");
+const Inventory = require("../models/inventory");
+const StockUpdateLog = require("../models/stockupdateLog"); 
 
-/**
- * 1. GET PHARMACY INVENTORY
- * Fetches a specific pharmacy's inventory and populates the master drug details.
- */
+//--------------------------------------------------------------------------------
+ /* 1. GET PHARMACY INVENTORY
+ * Fetches a specific pharmacy's inventory and populates the master drug details.*/
+//--------------------------------------------------------------------------------
 const getPharmacyInventory = async (pharmacyId, searchTerm = "") => {
   // Filter strictly to the logged-in pharmacy's ID
   let query = { pharmacyId: pharmacyId };
@@ -25,11 +27,11 @@ const getPharmacyInventory = async (pharmacyId, searchTerm = "") => {
   return inventory;
 };
 
-/**
- * 2. UPDATE OR ADD INVENTORY ITEM
+//-------------------------------------------------------------------------------
+ /*2. UPDATE OR ADD INVENTORY ITEM
  * Updates an existing stock record or creates a new one (upsert).
- * Automatically calculates the 'inStock' boolean based on quantity.
- */
+ * Automatically calculates the 'inStock' boolean based on quantity.*/
+ //-----------------------------------------------------------------------------
 const updateInventoryItem = async (pharmacyId, drugId, data) => {
   const { stockQuantity, price, notes } = data;
 
@@ -55,7 +57,54 @@ const updateInventoryItem = async (pharmacyId, drugId, data) => {
   );
 };
 
+
+
+//-------------------------------------------------------------------------------
+ /* 3. ADMIN AUDIT TRAIL LOGGING
+ * Logs any changes to inventory items for auditing purposes.*/
+//-------------------------------------------------------------------------------
+const updateInventoryItem = async (pharmacyId, drugId, updateData) => {
+  const { stockQuantity, price, notes } = updateData;
+
+  // 1. Fetch old data to calculate changes
+  let item = await Inventory.findOne({ pharmacyId, drugId });
+  const oldQuantity = item ? item.stockQuantity : 0;
+  const oldPrice = item ? item.price : 0;
+
+  // 2. Perform upsert
+  const updatedItem = await Inventory.findOneAndUpdate(
+    { pharmacyId, drugId },
+    {
+      stockQuantity,
+      price,
+      notes,
+      inStock: stockQuantity > 0, 
+    },
+    { new: true, upsert: true } 
+  );
+
+  // 3. 🛡️ Log for Admin Audit Trail 🛡️
+  if (oldQuantity !== stockQuantity || oldPrice !== price) {
+    try {
+      await StockUpdateLog.create({
+        pharmacyId,
+        drugId,
+        oldQuantity,
+        newQuantity: stockQuantity,
+        oldPrice,
+        newPrice: price,
+      });
+    } catch (logError) {
+      console.error("Failed to save StockUpdateLog:", logError.message);
+    }
+  }
+
+  return updatedItem;
+};
+
+
 module.exports = {
   getPharmacyInventory,
+  updateInventoryItem,
   updateInventoryItem
 };

@@ -3,7 +3,6 @@ const Drug = require("../models/drug");
 const Pharmacy = require("../models/pharmacy");
 const Inventory = require("../models/inventory");
 // NOTE: Ensure the filename is exactly 'searchLog.js' or 'SearchLog.js' in your models folder
-const SearchLog = require("../models/SearchLog"); 
 
 // ── Helper: clean Arabic text and remove diacritics ─────────
 const cleanQuery = (text) => {
@@ -169,9 +168,34 @@ const getNearbyPharmaciesWithDrug = async (drugId, lat, lng) => {
   return pharmacies;
 };
 
+
+
+const searchDruglist = async (query, clientId) => {
+  // Execute Search
+  const results = await Drug.find({
+    name: { $regex: query, $options: "i" }
+  });
+
+  // 🧠 Log for AI Demand Forecasting 🧠
+  try {
+    await SearchLog.create({
+      query: query,
+      clientId: clientId || null,
+      results: results.map(drug => drug._id),
+      resultCount: results.length
+    });
+  } catch (logError) {
+    console.error("Failed to save SearchLog:", logError.message);
+  }
+
+  return results;
+};
+
+
 module.exports = {
   searchDruglist,
   searchnearbyPharmacies,
   getDrugDetails,
   getNearbyPharmaciesWithDrug,
+  searchDruglist
 };
