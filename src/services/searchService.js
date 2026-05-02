@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 const Drug = require("../models/drug");
 const Pharmacy = require("../models/pharmacy");
 const Inventory = require("../models/inventory");
-// NOTE: Ensure the filename is exactly 'searchLog.js' or 'SearchLog.js' in your models folder
+const SearchLog = require("../models/SearchLog"); // ✅ ADDED THIS IMPORT
 
 // ── Helper: clean Arabic text and remove diacritics ─────────
 const cleanQuery = (text) => {
@@ -27,33 +27,38 @@ const validateCoords = (lat, lng) => {
   return { latitude, longitude };
 };
 
-// ── Search Functionality ─────────────────────────────────────
+// ── Search Functionality (MERGED) ────────────────────────────
 // Example: /search?q=paracetamol
-const searchDruglist = async (query) => {
+const searchDruglist = async (query, clientId) => {
   const cleanedQuery = cleanQuery(query);
 
-  // Log the search query to the database
-  try {
-    if (cleanedQuery) {
-      await SearchLog.create({ query: cleanedQuery });
-    }
-  } catch (logError) {
-    console.error("Failed to log search query:", logError);
-  }
-
-  // Search for drugs matching the cleaned query  
-  const drugs = await Drug.find({
+  // 1. Search for drugs matching the cleaned query
+  const results = await Drug.find({
     $or: [
       { name: { $regex: cleanedQuery, $options: "i" } },
-      { name_en: { $regex: cleanedQuery, $options: "i" } }, // Added name_en based on your previous logs
+      { name_en: { $regex: cleanedQuery, $options: "i" } },
       { category: { $regex: cleanedQuery, $options: "i" } },
     ],
   }).lean();
 
-  return drugs;
+  // 2. 🧠 Log for AI Demand Forecasting 🧠
+  try {
+    if (cleanedQuery) {
+      await SearchLog.create({
+        query: cleanedQuery, // Using your cleaned text for better AI stats
+        clientId: clientId || null,
+        results: results.map(drug => drug._id),
+        resultCount: results.length
+      });
+    }
+  } catch (logError) {
+    console.error("Failed to save SearchLog:", logError.message);
+  }
+
+  return results;
 };
 
-// ── Search Nearby Pharmacies ─────────────────────────────────────
+// ── Search Nearby Pharmacies ─────────────────────────────────
 // Example: /search/nearby?latitude=30.0444&longitude=31.2357
 const searchnearbyPharmacies = async (lat, lng) => {
   const { latitude, longitude } = validateCoords(lat, lng);
@@ -139,7 +144,7 @@ const getNearbyPharmaciesWithDrug = async (drugId, lat, lng) => {
                 $and: [
                   { $eq: ["$pharmacyId", "$$pharmacyId"] },
                   { $eq: ["$drugId", new mongoose.Types.ObjectId(drugId)] },
-                  { $eq: ["$inStock", true] },  // ✅ only in-stock
+                  { $eq: ["$inStock", true] },
                 ],
               },
             },
@@ -156,40 +161,16 @@ const getNearbyPharmaciesWithDrug = async (drugId, lat, lng) => {
         _id: 1,
         pharmacyName: 1,
         address: 1,
-        pharmacyPhone: 1,                                          // ✅ correct field name
-        coordinates: "$location.coordinates",                      // ✅ flat [lng, lat] for Geoapify
+        pharmacyPhone: 1,
+        coordinates: "$location.coordinates",
         distanceMeters: { $round: ["$distanceMeters", 0] },
-        price: { $arrayElemAt: ["$matchingInventory.price", 0] }, // ✅ price from inventory
+        price: { $arrayElemAt: ["$matchingInventory.price", 0] },
       },
     },
   ]);
 
   return pharmacies;
 };
-
-
-
-const searchDruglist = async (query, clientId) => {
-  // Execute Search
-  const results = await Drug.find({
-    name: { $regex: query, $options: "i" }
-  });
-
-  // 🧠 Log for AI Demand Forecasting 🧠
-  try {
-    await SearchLog.create({
-      query: query,
-      clientId: clientId || null,
-      results: results.map(drug => drug._id),
-      resultCount: results.length
-    });
-  } catch (logError) {
-    console.error("Failed to save SearchLog:", logError.message);
-  }
-
-  return results;
-};
-
 
 module.exports = {
   searchDruglist,
