@@ -39,7 +39,6 @@ const searchDruglist = async (query) => {
     }
   } catch (logError) {
     console.error("Failed to log search query:", logError);
-    // We don't throw here so the user still gets their search results
   }
 
   // Search for drugs matching the cleaned query  
@@ -58,7 +57,7 @@ const searchDruglist = async (query) => {
 // Example: /search/nearby?latitude=30.0444&longitude=31.2357
 const searchnearbyPharmacies = async (lat, lng) => {
   const { latitude, longitude } = validateCoords(lat, lng);
-  
+
   const pharmacies = await Pharmacy.aggregate([
     {
       $geoNear: {
@@ -116,7 +115,7 @@ const getDrugDetails = async (drugId) => {
 // Example: /drug/:id/nearby?latitude=30.0444&longitude=31.2357
 const getNearbyPharmaciesWithDrug = async (drugId, lat, lng) => {
   if (!mongoose.Types.ObjectId.isValid(drugId)) throw new Error("INVALID_ID");
-  
+
   const { latitude, longitude } = validateCoords(lat, lng);
 
   const pharmacies = await Pharmacy.aggregate([
