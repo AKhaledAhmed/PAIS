@@ -196,6 +196,5 @@ module.exports = {
   searchDruglist,
   searchnearbyPharmacies,
   getDrugDetails,
-  getNearbyPharmaciesWithDrug,
-  searchDruglist
+  getNearbyPharmaciesWithDrug
 };
