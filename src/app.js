@@ -1,11 +1,11 @@
-require("dotenv").config();
+require("dotenv").config(); //
 const express  = require("express");
 const mongoose = require("mongoose");
 const cors     = require("cors");
-const helmet   = require("helmet");
-const morgan   = require("morgan");
+const helmet   = require("helmet"); // For setting secure HTTP headers[cite: 8]
+const morgan   = require("morgan"); // For logging HTTP requests[cite: 8]
 
-// ── Controllers ──────────────────────────────────────────────
+// ── Controllers ──────────────────────────────────────────────[cite: 8]
 const {
   registerClient,
   loginClient,
@@ -26,7 +26,7 @@ const {
   refreshAdminToken,
   logoutAdmin,
   getMe: getAdminMe,
-} = require("./controllers/admincontroller");
+} = require("./controllers/admincontroller"); //[cite: 7, 8]
 
 const {
   searchDrugs,
@@ -49,10 +49,9 @@ const {
   updateItem
 } = require("./controllers/inventorycontroller");
 
-// RESTORED: Import the alternative controller
 const { getAlternatives } = require("./controllers/alternativecontroller");
 
-// ── Middleware ───────────────────────────────────────────────
+// ── Middleware ───────────────────────────────────────────────[cite: 8]
 const { protect, restrictTo } = require("./middleware/auth");
 
 // ── Validators ───────────────────────────────────────────────
@@ -62,25 +61,40 @@ const {
   clientLoginRules,
   pharmacyRegisterRules,
   pharmacyLoginRules,
+  loginAdmin: adminLoginRules, // RENAME to avoid conflict with controller[cite: 6, 8]
   refreshRules, 
 } = require("./utils/validators");
 
 const app = express();
 
-// ── Global middleware ────────────────────────────────────────
+// ── Global middleware ────────────────────────────────────────[cite: 8]
 app.use(helmet());
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || "*", credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-if (process.env.NODE_ENV !== "production") app.use(morgan("dev"));
 
-// ── Basic Route ───────────────────────────────────────────────
+// ── Morgan Security Fix: Redact Passwords in Logs ─────────────[cite: 8]
+const SENSITIVE_FIELDS = ['password', 'confirmPassword', 'refreshToken'];
+morgan.token('body', (req) => {
+  if (!req.body || Object.keys(req.body).length === 0) return '';
+  const bodyToLog = { ...req.body };
+  SENSITIVE_FIELDS.forEach(field => {
+    if (bodyToLog[field]) bodyToLog[field] = '********';
+  });
+  return JSON.stringify(bodyToLog);
+});
+
+if (process.env.NODE_ENV !== "production") {
+  app.use(morgan(':method :url :status - :response-time ms | Body: :body'));
+}
+
+// ── Basic Route ───────────────────────────────────────────────[cite: 8]
 app.get("/", (req, res) => {
   res.status(200).json({ success: true, message: "PAIS API is running!" });
 });
 
 // ────────────────────────────────────────────────────────────
-// AUTH ROUTES (Client, Pharmacy, Admin)
+// AUTH ROUTES (Client, Pharmacy, Admin)[cite: 8]
 // ────────────────────────────────────────────────────────────
 app.post("/api/client/register", clientRegisterRules, validate, registerClient);
 app.post("/api/client/login",    clientLoginRules,    validate, loginClient);
@@ -90,27 +104,26 @@ app.post("/api/pharmacy/register", pharmacyRegisterRules, validate, registerPhar
 app.post("/api/pharmacy/login",    pharmacyLoginRules,    validate, loginPharmacy);
 app.get( "/api/pharmacy/me",       protect, restrictTo("pharmacy"), getPharmacyMe);
 
-app.post("/api/admin/login",   loginAdmin);
+// FIX: Added adminLoginRules and validate middleware[cite: 6, 7, 8]
+app.post("/api/admin/login",   adminLoginRules, validate, loginAdmin); 
 app.get( "/api/admin/me",      protect, restrictTo("admin"), getAdminMe);
 
-// Shared / General Auth
+// Shared / General Auth[cite: 8]
 app.get( "/api/auth/me",      protect, getClientMe);
 app.post("/api/auth/logout",  refreshRules, validate, logoutClient);
 app.post("/api/auth/refresh", refreshRules, validate, refreshAccessToken);
 
 // ────────────────────────────────────────────────────────────
-// SEARCH & AI (Client Facing)
+// SEARCH & AI (Client Facing)[cite: 8]
 // ────────────────────────────────────────────────────────────
 app.get("/api/search",                        searchDrugs);
 app.get("/api/search/nearby",                 getNearbypharmacies);
 app.get("/api/search/:drugId/nearby",         getNearbyPharmaciesWithDrug);
 app.get("/api/search/:drugId",                getDrugDetails);
-
-// RESTORED: Route for clients to find alternative drugs
 app.get("/api/search/:drugId/alternatives",   protect, getAlternatives);
 
 // ────────────────────────────────────────────────────────────
-// DRUG MANAGEMENT (Admin)
+// DRUG MANAGEMENT (Admin)[cite: 8]
 // ────────────────────────────────────────────────────────────
 app.get(   "/api/drugs",      protect, restrictTo("admin"), getDrugs);
 app.post(  "/api/drugs",      protect, restrictTo("admin"), upsertDrug);
@@ -119,22 +132,15 @@ app.put(   "/api/drugs/:id",  protect, restrictTo("admin"), upsertDrug);
 app.delete("/api/drugs/:id",  protect, restrictTo("admin"), deleteDrug);
 
 // ────────────────────────────────────────────────────────────
-// INVENTORY (Pharmacy)
+// INVENTORY (Pharmacy)[cite: 8]
 // ────────────────────────────────────────────────────────────
-// 1. Search the main catalog to find new drugs to add
 app.get( "/api/inventory/search-catalog", protect, restrictTo("pharmacy"), searchMasterCatalog);
-
-// 2. Get the pharmacy's entire current inventory
 app.get( "/api/inventory",                protect, restrictTo("pharmacy"), getMyInventory);
-
-// 3. Get a specific inventory item (to pre-fill the Edit form)
 app.get( "/api/inventory/item/:drugId",   protect, restrictTo("pharmacy"), getInventoryItem);
-
-// 4. Save / Update a drug in the inventory
 app.patch( "/api/inventory/update",       protect, restrictTo("pharmacy"), updateItem);
 
 // ────────────────────────────────────────────────────────────
-// Error Handling
+// Error Handling[cite: 8]
 // ────────────────────────────────────────────────────────────
 app.use((req, res) =>
   res.status(404).json({ success: false, message: "Route not found" })
@@ -147,6 +153,7 @@ app.use((err, req, res, next) => {
   });
 });
 
+// ── Database Connection ──────────────────────────────────────[cite: 8]
 mongoose.connect(process.env.MONGO_URI).then(() => {
   console.log("✅ MongoDB connected");
   const PORT = process.env.PORT || 5000;

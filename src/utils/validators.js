@@ -55,7 +55,7 @@ const clientRegisterRules = [
 
   body("password")
     .notEmpty().withMessage("Password is required")
-    .isLength({ min: 8 }).withMessage("Password must be at least 8 characters")
+    .isLength({ min: 8, max: 128 }).withMessage("Password must be at least 8 characters")
     .matches(/[A-Z]/).withMessage("Password must contain at least one uppercase letter")
     .matches(/[0-9]/).withMessage("Password must contain at least one number")
     .matches(/[!@#$%^&*(),.?":{}|<>]/).withMessage("Password must contain at least one special character"),
@@ -126,7 +126,16 @@ const pharmacyRegisterRules = [
 
   body("password")
     .notEmpty().withMessage("Password is required")
-    .isLength({ min: 8 }).withMessage("Password must be at least 8 characters"),
+    .isLength({ min: 8, max: 128 }).withMessage("Password must be at least 8 characters"),
+    
+  body("confirmPassword")
+    .notEmpty().withMessage("Please confirm your password")
+    .custom((value, { req }) => {
+      if (value !== req.body.password) {
+        throw new Error("Passwords do not match");
+      }
+      return true;
+    }),
 
   // ── Coordinates from Geoapify map picker ──────────────────
   body("lat")
