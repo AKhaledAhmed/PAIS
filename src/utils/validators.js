@@ -176,14 +176,8 @@ const pharmacyLoginRules = [
 
 // ── Admin Login Rules ─────────────────────────────────────
 const loginAdmin = [
-  body("email")
-    .trim()
-    .notEmpty().withMessage("Email is required")
-    .isEmail().withMessage("Must be a valid email address")
-    .normalizeEmail(),
-
-  body("password")
-    .notEmpty().withMessage("Password is required"),
+  body("email").trim().notEmpty().withMessage("Email is required"),
+  body("password").notEmpty().withMessage("Password is required"),
 ];
 // ── Refresh Token Rules ───────────────────────────────────
 const refreshRules = [
