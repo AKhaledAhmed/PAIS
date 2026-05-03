@@ -176,9 +176,11 @@ const pharmacyLoginRules = [
 
 // ── Admin Login Rules ─────────────────────────────────────
 const loginAdmin = [
-  body("username")
+  body("email")
     .trim()
-    .notEmpty().withMessage("Username is required"),
+    .notEmpty().withMessage("Email is required")
+    .isEmail().withMessage("Must be a valid email address")
+    .normalizeEmail(),
 
   body("password")
     .notEmpty().withMessage("Password is required"),
