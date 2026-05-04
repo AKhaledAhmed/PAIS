@@ -11,10 +11,10 @@ const registerPharmacy = async (req, res) => {
     const { 
       pharmacyName, 
       ownerName, 
-      location, // Kept in case you use it elsewhere, but lat/lng are used for the DB
+      address, 
       licenseId, 
       pharmacyPhone, // Fixed casing
-      password, 
+      password,
       pharmacyEmail, 
       acceptedTerms,
       lat,
@@ -22,28 +22,16 @@ const registerPharmacy = async (req, res) => {
     } = req.body;
 
     // ── Duplicate checks ───────────────────────────────────
-    const existingEmail = await Pharmacy.findOne({ pharmacyEmail });
-    if (existingEmail) {
-      return res.status(409).json({
-        success: false,
-        message: "A pharmacy with this email address is already registered.",
-      });
-    }
-
-    const existingLicense = await Pharmacy.findOne({ licenseId });
-    if (existingLicense) {
-      return res.status(409).json({
-        success: false,
-        message: "A pharmacy with this license ID is already registered.",
-      });
-    }
-
+   const existing = await Pharmacy.findOne({ 
+      $or: [{ pharmacyEmail }, { licenseId }] 
+    });
+    if (existing) return res.status(409).json({ success: false, message: "Email or License already exists." });
     // ── Save pharmacy ──────────────────────────────────────
     const pharmacy = await Pharmacy.create({
       pharmacyName,
       ownerName,
       // Map location strictly into the required GeoJSON format
-      address: location,
+      address,
       location: {
         type: "Point",
         coordinates: [lng, lat], 
@@ -52,7 +40,7 @@ const registerPharmacy = async (req, res) => {
       pharmacyEmail,
       pharmacyPhone,
       password,
-      acceptedTerms: acceptedTerms === true || acceptedTerms === "true",
+      acceptedTerms,
     });
 
     // ── Fire-and-forget mock email (don't block the response) ──
@@ -188,36 +176,42 @@ const loginPharmacy = async (req, res) => {
   }
 };
 
+// ─────────────────────────────────────────────────────────────
+// POST /api/auth/pharmacy/logout
+// ─────────────────────────────────────────────────────────────
 const logoutPharmacy = async (req, res) => {
   try {
-    const { refreshToken } = req.body;
-    
-    if (!refreshToken) {
-      return res.status(400).json({
-        success: false,
-        message: "Refresh token is required to log out.",
-      });
+    const { refreshToken } = req.body || {};
+
+    let decoded;
+    try {
+      decoded = verifyRefreshToken(refreshToken);
+    } catch (err) {
+      // If the token is already invalid/expired, they are effectively logged out
+      return res.status(200).json({ success: true, message: "Logged out." });
     }
 
-    // Remove the refresh token from the pharmacy's document
-    await Pharmacy.updateOne(
-      { _id: req.user.id },
-      { $pull: { refreshTokens: refreshToken } }
-    );
+    if (decoded.role !== "pharmacy") {
+      return res.status(403).json({ success: false, message: "Invalid access." });
+    }
 
-    return res.status(200).json({
-      success: true,
-      message: "Logged out successfully.",
-    });
+    const pharmacy = await Pharmacy.findById(decoded.id).select("+refreshTokens"); 
+    
+    if (pharmacy) {
+      pharmacy.refreshTokens = pharmacy.refreshTokens.filter(t => t !== refreshToken);
+      await pharmacy.save({ validateBeforeSave: false }); 
+    }
+    
+    return res.status(200).json({ success: true, message: "Logged out successfully." });
   } catch (error) {
     console.error("logoutPharmacy error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Server error. Please try again later.",
-    });
+    return res.status(500).json({ success: false, message: "Server error." });
   }
 };
 
+// ─────────────────────────────────────────────────────────────
+// GET /api/pharmacy/me
+// ─────────────────────────────────────────────────────────────
 const getMe = async (req, res) => {
   try {
     const pharmacy = await Pharmacy.findById(req.user.id).select("-password -refreshTokens");

@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const { v4: uuidv4 } = require("uuid");
 const bcrypt = require("bcryptjs");
 
+
 const clientSchema = new mongoose.Schema(
   {
     firstName: {
@@ -63,8 +64,8 @@ const clientSchema = new mongoose.Schema(
 );
 
 // ── Hash password before saving ───────────────────────────
-clientSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return;
+clientSchema.pre("save", async function () { 
+  if (!this.isModified("password")) return; // Only hash if password is new or changed
   const salt = await bcrypt.genSalt(12);
   this.password = await bcrypt.hash(this.password, salt);
 });

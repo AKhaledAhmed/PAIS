@@ -51,8 +51,9 @@ const clientRegisterRules = [
 
   body("gender")
     .notEmpty().withMessage("Gender is required")
-    .isBoolean().withMessage("Gender must be a boolean (true = male, false = female)"),
-
+    .isBoolean().withMessage("Gender must be a boolean (true = male, false = female)")
+    .toBoolean(),
+    
   body("password")
     .notEmpty().withMessage("Password is required")
     .isLength({ min: 8, max: 128 }).withMessage("Password must be at least 8 characters")
@@ -71,9 +72,9 @@ const clientRegisterRules = [
 
   body("acceptedTerms")
     .notEmpty().withMessage("You must accept the terms and conditions")
-    .isBoolean().withMessage("acceptedTerms must be a boolean")
+    .toBoolean() // Converts "true", 1, or "1" into the literal boolean: true
     .custom((value) => {
-      if (value !== true && value !== "true") {
+      if (value !== true) {
         throw new Error("You must accept the terms and conditions");
       }
       return true;
@@ -103,10 +104,10 @@ const pharmacyRegisterRules = [
     .notEmpty().withMessage("Owner name is required")
     .isLength({ max: 100 }).withMessage("Owner name must be under 100 characters"),
 
-  body("location")
+  body("address")
     .trim()
-    .notEmpty().withMessage("Location is required")
-    .isLength({ max: 200 }).withMessage("Location must be under 200 characters"),
+    .notEmpty().withMessage("Address is required")
+    .isLength({ max: 200 }).withMessage("Address must be under 200 characters"),
 
   body("licenseId")
     .trim()
@@ -126,8 +127,11 @@ const pharmacyRegisterRules = [
 
   body("password")
     .notEmpty().withMessage("Password is required")
-    .isLength({ min: 8, max: 128 }).withMessage("Password must be at least 8 characters"),
-    
+    .isLength({ min: 8, max: 128 }).withMessage("Password must be at least 8 characters")
+    .matches(/[A-Z]/).withMessage("Password must contain at least one uppercase letter")
+    .matches(/[0-9]/).withMessage("Password must contain at least one number")
+    .matches(/[!@#$%^&*(),.?":{}|<>]/).withMessage("Password must contain at least one special character"),
+
   body("confirmPassword")
     .notEmpty().withMessage("Please confirm your password")
     .custom((value, { req }) => {
@@ -150,9 +154,9 @@ const pharmacyRegisterRules = [
 
   body("acceptedTerms")
     .notEmpty().withMessage("You must accept the terms and conditions")
-    .isBoolean().withMessage("acceptedTerms must be a boolean")
+    .toBoolean() // Converts "true", 1, or "1" into the literal boolean: true
     .custom((value) => {
-      if (value !== true && value !== "true") {
+      if (value !== true) {
         throw new Error("You must accept the terms and conditions");
       }
       return true;
@@ -185,7 +189,9 @@ const pharmacyLoginRules = [
 
 // ── Admin Login Rules ─────────────────────────────────────
 const loginAdmin = [
-  body("email").trim().notEmpty().withMessage("Email is required"),
+  body("email").trim().notEmpty().withMessage("Email is required")
+    .isEmail().withMessage("Must be a valid email address")
+    .normalizeEmail(),
   body("password").notEmpty().withMessage("Password is required"),
 ];
 // ── Refresh Token Rules ───────────────────────────────────

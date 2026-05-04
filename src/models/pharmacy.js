@@ -34,7 +34,7 @@ const pharmacySchema = new mongoose.Schema(
         default: "Point",
       },
       coordinates: {
-        type: [Number], // MUST be an array: [lng, lat]
+        type: [Number], // MUST be an array: [lat, lng]
         required: [true, "Coordinates are required"],
       }
     },
@@ -90,11 +90,9 @@ const pharmacySchema = new mongoose.Schema(
   }
 );
 
-// Middleware to hash password before saving
-// EDITED: Removed `next` argument as it is not used in Mongoose 5+ async hooks
+
 pharmacySchema.pre("save", async function () {
-  // 1. Only run if password exists and was modified
-  // This prevents errors during initial "Pending" registration where password is null
+// 1. Only hash if password is new or modified
   if (!this.password || !this.isModified("password")) return;
 
   try {
@@ -102,15 +100,13 @@ pharmacySchema.pre("save", async function () {
     const salt = await bcrypt.genSalt(12);
     this.password = await bcrypt.hash(this.password, salt);
   } catch (err) {
-    // EDITED: Throw the error so Mongoose can catch it instead of using next(err)
+    
     throw err;
   }
 });
 
-// Enable 2dsphere index for distance-based ranking
 pharmacySchema.index({ location: "2dsphere" });
 
-// Helper method to check password during login
 pharmacySchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };

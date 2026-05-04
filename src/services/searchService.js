@@ -39,7 +39,7 @@ const searchDruglist = async (query, clientId) => {
       { name_en: { $regex: cleanedQuery, $options: "i" } },
       { category: { $regex: cleanedQuery, $options: "i" } },
     ],
-  }).lean();
+  }).limit(20).lean(); // Using .lean() for faster read-only queries
 
   // 2. 🧠 Log for AI Demand Forecasting 🧠
   try {

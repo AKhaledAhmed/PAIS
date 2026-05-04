@@ -28,8 +28,8 @@ const loginAdmin = async (req, res) => {
 
     // ── Generate tokens ────────────────────────────────────
     const payload = { id: admin._id, role: "admin" };
-    const accessToken = await signAccessToken(payload);
-    const refreshToken = await signRefreshToken(payload);
+    const accessToken =  signAccessToken(payload);
+    const refreshToken =  signRefreshToken(payload);
 
     // ── Persist refresh token ──────────────────────────────
     admin.refreshTokens.push(refreshToken);
@@ -50,7 +50,7 @@ const loginAdmin = async (req, res) => {
         admin: adminData,
         accessToken,
         refreshToken,
-        expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "15m",
+        expiresIn: process.env.JWT_ACCESS_EXPIRES_IN,
       },
     });
   } catch (error) {
@@ -66,66 +66,37 @@ const loginAdmin = async (req, res) => {
 // POST /api/auth/admin/refresh
 // Body: { refreshToken }
 // ─────────────────────────────────────────────────────────────
+
 const refreshAdminToken = async (req, res) => {
   try {
-    const { refreshToken } = req.body;
+    const { refreshToken } = req.body || {};
+    if (!refreshToken) return res.status(400).json({ success: false, message: "Token required." });
 
-    // ── Verify token signature & expiry ───────────────────
-    let decoded;
-    try {
-      decoded = verifyRefreshToken(refreshToken);
-    } catch (err) {
-      return res.status(401).json({
-        success: false,
-        message:
-          err.name === "TokenExpiredError"
-            ? "Refresh token has expired. Please log in again."
-            : "Invalid refresh token.",
-      });
-    }
+    const decoded = verifyRefreshToken(refreshToken); // Synchronous call
+    if (decoded.role !== "admin") return res.status(403).json({ success: false, message: "Access denied." });
 
-    // ── Ensure it belongs to an admin ──────────────────────
-    if (decoded.role !== "admin") {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied.",
-      });
-    }
-
-    // ── Check token exists in DB ───────────────────────────
     const admin = await Admin.findById(decoded.id).select("+refreshTokens");
     if (!admin || !admin.refreshTokens.includes(refreshToken)) {
-      return res.status(401).json({
-        success: false,
-        message: "Refresh token is invalid or has been revoked. Please log in again.",
-      });
+      return res.status(401).json({ success: false, message: "Revoked or invalid token." });
     }
 
-    // ── Rotate tokens ──────────────────────────────────────
+    // Token Rotation
     admin.refreshTokens = admin.refreshTokens.filter((t) => t !== refreshToken);
-
     const payload = { id: admin._id, role: "admin" };
-    const newAccessToken = await signAccessToken(payload);
-    const newRefreshToken = await signRefreshToken(payload);
+    const newAccessToken = signAccessToken(payload); 
+    const newRefreshToken = signRefreshToken(payload);
 
     admin.refreshTokens.push(newRefreshToken);
-    await admin.save({ validateBeforeSave: false });
+    if (admin.refreshTokens.length > 5) admin.refreshTokens = admin.refreshTokens.slice(-5);
+    
+    await admin.save({ validateBeforeSave: false }); // Skip validation
 
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
-      message: "Tokens refreshed.",
-      data: {
-        accessToken: newAccessToken,
-        refreshToken: newRefreshToken,
-        expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "15m",
-      },
+      data: { accessToken: newAccessToken, refreshToken: newRefreshToken },
     });
   } catch (error) {
-    console.error("refreshAdminToken error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Server error. Please try again later.",
-    });
+    res.status(401).json({ success: false, message: "Session expired." });
   }
 };
 
@@ -135,7 +106,8 @@ const refreshAdminToken = async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 const logoutAdmin = async (req, res) => {
   try {
-    const { refreshToken } = req.body;
+    // 1. Safety guard for missing body
+    const { refreshToken } = req.body || {}; 
 
     if (!refreshToken) {
       return res.status(400).json({
@@ -146,15 +118,31 @@ const logoutAdmin = async (req, res) => {
 
     let decoded;
     try {
+      // verifyRefreshToken is synchronous based on your tokens.js
       decoded = verifyRefreshToken(refreshToken);
-    } catch {
-      // Already expired — treat as logged out
+    } catch (err) {
+      // If the token is already expired or invalid, the user is effectively 
+      // logged out already. We return 200 to clear the frontend state.
       return res.status(200).json({ success: true, message: "Logged out." });
     }
 
+    // 2. Role Verification: Ensure an admin token is being used
+    if (decoded.role !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Invalid token role.",
+      });
+    }
+
+    // 3. Find admin and retrieve hidden tokens array
     const admin = await Admin.findById(decoded.id).select("+refreshTokens");
+    
     if (admin) {
+      // Remove only the specific token used for this session
       admin.refreshTokens = admin.refreshTokens.filter((t) => t !== refreshToken);
+      
+      // CRITICAL: This will trigger the pre("save") hook in admin.js
+      // Ensure you removed "next" from that async hook to avoid a 500 error
       await admin.save({ validateBeforeSave: false });
     }
 
@@ -163,6 +151,7 @@ const logoutAdmin = async (req, res) => {
       message: "Logged out successfully.",
     });
   } catch (error) {
+    // Logs the actual crash reason to your terminal for debugging
     console.error("logoutAdmin error:", error);
     return res.status(500).json({
       success: false,
@@ -178,12 +167,21 @@ const getMe = async (req, res) => {
   try {
     const admin = await Admin.findById(req.user.id);
     if (!admin) {
-      return res.status(404).json({ success: false, message: "Admin not found." });
+      return res.status(404).json({ 
+        success: false, 
+        message: "Admin profile not found." 
+      });
     }
-    return res.status(200).json({ success: true, data: admin });
+    return res.status(200).json({ 
+      success: true, 
+      data: admin 
+    });
   } catch (error) {
     console.error("getMe (admin) error:", error);
-    return res.status(500).json({ success: false, message: "Server error." });
+    return res.status(500).json({ 
+      success: false, 
+      message: "Server error occurred while fetching profile." 
+    });
   }
 };
 
