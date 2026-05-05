@@ -1,8 +1,8 @@
 const { verifyAccessToken } = require("../utils/tokens");
 
 /**
- * Protect middleware — validates the Bearer access token.
- * Attaches decoded payload to req.user on success.
+ * 🔒 Strict Protect — Requires a valid token.
+ * Use for: Admin actions, Inventory management, or viewing alternatives.
  */
 const protect = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -35,6 +35,35 @@ const protect = (req, res, next) => {
   }
 };
 
+/**
+ * 🔓 Optional Protect — Identifies the user if a token exists, but allows guests.
+ * Use for: Search and nearby pharmacy routes to track AI Demand.
+ */
+const optionalProtect = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+
+  // 1. If no Bearer token is provided, proceed as a guest
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return next(); 
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  try {
+    // 2. Try to verify the token
+    const decoded = verifyAccessToken(token);
+    req.user = decoded; // Attach the user info if valid
+    next();
+  } catch (err) {
+    // 3. If token is expired or fake, we don't block them. 
+    // We just treat them as a guest (req.user stays undefined).
+    next();
+  }
+};
+
+/**
+ * 🛡️ Role Restriction — Validates user role permissions.
+ */
 const restrictTo = (...allowedRoles) => {
   return (req, res, next) => {
     if (!req.user || !allowedRoles.includes(req.user.role)) {
@@ -47,4 +76,5 @@ const restrictTo = (...allowedRoles) => {
   };
 };
 
-module.exports = { protect, restrictTo };
+// ✅ Don't forget to add optionalProtect to the exports!
+module.exports = { protect, restrictTo, optionalProtect };

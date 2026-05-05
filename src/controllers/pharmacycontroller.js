@@ -1,6 +1,7 @@
 const Pharmacy = require("../models/pharmacy");
 const { sendPharmacyConfirmationEmail } = require("../utils/emailMock");
 const { signAccessToken, signRefreshToken } = require("../utils/tokens");
+const { getCoordsFromAddress } = require("../utils/locationHelper");
 
 // ─────────────────────────────────────────────────────────────
 // POST /api/auth/pharmacy/register
@@ -19,22 +20,38 @@ const registerPharmacy = async (req, res) => {
       acceptedTerms,
       lat,
       lng
+      
     } = req.body;
 
+
+    let finalLat = lat;
+    let finalLng = lng;
+    if (!finalLat || !finalLng) {
+      try {
+        const coords = await getCoordsFromAddress(address); // The Safety Net
+        finalLat = coords.lat;
+        finalLng = coords.lng;
+      } catch (geoError) {
+        return res.status(400).json({ success: false, message: "Invalid address." });
+      }
+    }
+
     // ── Duplicate checks ───────────────────────────────────
-   const existing = await Pharmacy.findOne({ 
+  const existing = await Pharmacy.findOne({ 
       $or: [{ pharmacyEmail }, { licenseId }] 
     });
-    if (existing) return res.status(409).json({ success: false, message: "Email or License already exists." });
+    
+    if (existing) {
+      return res.status(409).json({ success: false, message: "Email or License already exists." });
+    }
     // ── Save pharmacy ──────────────────────────────────────
     const pharmacy = await Pharmacy.create({
       pharmacyName,
       ownerName,
-      // Map location strictly into the required GeoJSON format
-      address,
+      address, // Save the text for records
       location: {
         type: "Point",
-        coordinates: [lng, lat], 
+        coordinates: [finalLng, finalLat], 
       },
       licenseId,
       pharmacyEmail,
@@ -48,14 +65,12 @@ const registerPharmacy = async (req, res) => {
     try {
       emailPreviewUrl = await sendPharmacyConfirmationEmail(pharmacy);
     } catch (emailErr) {
-      // Email failure is non-fatal — pharmacy is still registered
       console.error("Mock email error (non-fatal):", emailErr.message);
     }
 
     return res.status(201).json({
       success: true,
-      message:
-        "Pharmacy registration received. A confirmation email has been sent. Login credentials will be provided after your application is reviewed.",
+      message: "Pharmacy registration received. A confirmation email has been sent. Login credentials will be provided after your application is reviewed.",
       data: {
         applicationId: pharmacy.applicationId,
         pharmacyName: pharmacy.pharmacyName,
@@ -64,7 +79,6 @@ const registerPharmacy = async (req, res) => {
         pharmacyEmail: pharmacy.pharmacyEmail,
         status: pharmacy.status,
         createdAt: pharmacy.createdAt,
-        // Only included in local/dev environments (Ethereal preview)
         ...(emailPreviewUrl && { emailPreviewUrl }),
       },
     });
@@ -73,9 +87,7 @@ const registerPharmacy = async (req, res) => {
 
     if (error.code === 11000) {
       const field = Object.keys(error.keyValue)[0];
-      const fieldLabel =
-        field === "pharmacyEmail" ? "email address" :
-        field === "licenseId"    ? "license ID"     : field;
+      const fieldLabel = field === "pharmacyEmail" ? "email address" : field === "licenseId" ? "license ID" : field;
 
       return res.status(409).json({
         success: false,

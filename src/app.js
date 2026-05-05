@@ -52,7 +52,7 @@ const {
 const { getAlternatives } = require("./controllers/alternativecontroller");
 
 // ── Middleware ───────────────────────────────────────────────[cite: 8]
-const { protect, restrictTo } = require("./middleware/auth");
+const { optionalProtect, protect, restrictTo } = require("./middleware/auth");
 
 // ── Validators ───────────────────────────────────────────────
 const {
@@ -116,10 +116,10 @@ app.post("/api/auth/refresh", refreshRules, validate, refreshAccessToken);
 // ────────────────────────────────────────────────────────────
 // SEARCH & AI (Client Facing)[cite: 8]
 // ────────────────────────────────────────────────────────────
-app.get("/api/search",                        searchDrugs);
-app.get("/api/search/nearby",                 getNearbypharmacies);
-app.get("/api/search/:drugId/nearby",         getNearbyPharmaciesWithDrug);
-app.get("/api/search/:drugId",                getDrugDetails);
+app.get("/api/search", optionalProtect, searchDrugs);
+app.get("/api/search/nearby", optionalProtect, getNearbypharmacies);
+app.get("/api/search/:drugId/nearby", optionalProtect, getNearbyPharmaciesWithDrug);
+app.get("/api/search/:drugId", optionalProtect, getDrugDetails);
 app.get("/api/search/:drugId/alternatives",   protect, getAlternatives);
 
 // ────────────────────────────────────────────────────────────
