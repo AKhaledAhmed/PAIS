@@ -26,11 +26,9 @@ const registerPharmacy = async (req, res) => {
 
     let finalLat = lat;
     let finalLng = lng;
-    console.time("Geocoding-Timer"); // ⏱️ Start timer
     if (!finalLat || !finalLng) {
       try {
         const coords = await getCoordsFromAddress(address); // The Safety Net
-        console.timeEnd("Geocoding-Timer"); // 🏁 End timer
         finalLat = coords.lat;
         finalLng = coords.lng;
       } catch (geoError) {
