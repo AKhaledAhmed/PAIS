@@ -74,7 +74,6 @@ const searchnearbyPharmacies = async (lat, lng, clientId = null) => {
         },
         distanceField: "distanceMeters",
         maxDistance: 5000,             // 5 km radius
-        query: { status: "approved" },
         spherical: true,
       },
     },
