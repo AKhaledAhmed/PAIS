@@ -14,3 +14,5 @@ const sendPharmacyConfirmationEmail = async (pharmacy) => {
     console.error("❌ Resend Error:", error.message);
   }
 };
+
+module.exports = { sendPharmacyConfirmationEmail };
