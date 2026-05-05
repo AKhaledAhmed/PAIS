@@ -21,11 +21,14 @@ const getTransporter = async () => {
       },
       // 🚀 THE FIX: Force IPv4 and add timeouts to prevent hanging
       family: 4, 
-      connectionTimeout: 15000, 
-  greetingTimeout: 10000,
+      connectionTimeout: 20000, 
+  greetingTimeout: 20000,
   socketTimeout: 30000,
+  debug: true,
+  logger: true,
       tls: {
-        rejectUnauthorized: false // Helps avoid issues with some SMTP servers
+        rejectUnauthorized: false, // Helps avoid issues with some SMTP servers
+        servername: "smtp.gmail.com" // Adjust if using a different provider
       }
     });
   } else {
