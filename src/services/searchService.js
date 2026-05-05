@@ -47,7 +47,7 @@ const searchDruglist = async (query, clientId, lat, lng) => {
     getDistrictFromCoords(lat, lng)
       .then(districtName => {
         return SearchLog.create({
-          query: cleanedQuery,
+          query: cleanedQuery || "EMPTY_QUERY", // In case the user searched for an empty string
           clientId,
           location: { type: "Point", coordinates: [lng, lat] }, // Standard GeoJSON
           district: districtName, 

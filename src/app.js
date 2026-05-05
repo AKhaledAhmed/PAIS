@@ -1,9 +1,9 @@
 require("dotenv").config(); //
-const express = require("express");
+const express  = require("express");
 const mongoose = require("mongoose");
-const cors = require("cors");
-const helmet = require("helmet"); // For setting secure HTTP headers[cite: 8]
-const morgan = require("morgan"); // For logging HTTP requests[cite: 8]
+const cors     = require("cors");
+const helmet   = require("helmet"); // For setting secure HTTP headers[cite: 8]
+const morgan   = require("morgan"); // For logging HTTP requests[cite: 8]
 
 // ── Controllers ──────────────────────────────────────────────[cite: 8]
 const {
@@ -62,7 +62,7 @@ const {
   pharmacyRegisterRules,
   pharmacyLoginRules,
   loginAdmin: adminLoginRules, // RENAME to avoid conflict with controller[cite: 6, 8]
-  refreshRules,
+  refreshRules, 
 } = require("./utils/validators");
 
 const app = express();
@@ -97,47 +97,47 @@ app.get("/", (req, res) => {
 // AUTH ROUTES (Client, Pharmacy, Admin)[cite: 8]
 // ────────────────────────────────────────────────────────────
 app.post("/api/client/register", clientRegisterRules, validate, registerClient);
-app.post("/api/client/login", clientLoginRules, validate, loginClient);
-app.get("/api/client/me", protect, getClientMe);
+app.post("/api/client/login",    clientLoginRules,    validate, loginClient);
+app.get( "/api/client/me",       protect, getClientMe);
 
 app.post("/api/pharmacy/register", pharmacyRegisterRules, validate, registerPharmacy);
-app.post("/api/pharmacy/login", pharmacyLoginRules, validate, loginPharmacy);
-app.get("/api/pharmacy/me", protect, restrictTo("pharmacy"), getPharmacyMe);
+app.post("/api/pharmacy/login",    pharmacyLoginRules,    validate, loginPharmacy);
+app.get( "/api/pharmacy/me",       protect, restrictTo("pharmacy"), getPharmacyMe);
 
 // FIX: Added adminLoginRules and validate middleware[cite: 6, 7, 8]
-app.post("/api/admin/login", adminLoginRules, validate, loginAdmin);
-app.get("/api/admin/me", protect, restrictTo("admin"), getAdminMe);
+app.post("/api/admin/login",   adminLoginRules, validate, loginAdmin); 
+app.get( "/api/admin/me",      protect, restrictTo("admin"), getAdminMe);
 
 // Shared / General Auth[cite: 8]
-app.get("/api/auth/me", protect, getClientMe);
-app.post("/api/auth/logout", refreshRules, validate, logoutClient);
+app.get( "/api/auth/me",      protect, getClientMe);
+app.post("/api/auth/logout",  refreshRules, validate, logoutClient);
 app.post("/api/auth/refresh", refreshRules, validate, refreshAccessToken);
 
 // ────────────────────────────────────────────────────────────
 // SEARCH & AI (Client Facing)[cite: 8]
 // ────────────────────────────────────────────────────────────
-app.get("/api/search", searchDrugs);
-app.get("/api/search/nearby", getNearbypharmacies);
-app.get("/api/search/:drugId/nearby", getNearbyPharmaciesWithDrug);
-app.get("/api/search/:drugId", getDrugDetails);
-app.get("/api/search/:drugId/alternatives", protect, getAlternatives);
+app.get("/api/search", optionalProtect, searchDrugs);
+app.get("/api/search/nearby", optionalProtect, getNearbypharmacies);
+app.get("/api/search/:drugId/nearby", optionalProtect, getNearbyPharmaciesWithDrug);
+app.get("/api/search/:drugId", optionalProtect, getDrugDetails);
+app.get("/api/search/:drugId/alternatives",   protect, getAlternatives);
 
 // ────────────────────────────────────────────────────────────
 // DRUG MANAGEMENT (Admin)[cite: 8]
 // ────────────────────────────────────────────────────────────
-app.get("/api/drugs", protect, restrictTo("admin"), getDrugs);
-app.post("/api/drugs", protect, restrictTo("admin"), upsertDrug);
-app.get("/api/drugs/:id", protect, restrictTo("admin"), getSingleDrug);
-app.put("/api/drugs/:id", protect, restrictTo("admin"), upsertDrug);
-app.delete("/api/drugs/:id", protect, restrictTo("admin"), deleteDrug);
+app.get(   "/api/drugs",      protect, restrictTo("admin"), getDrugs);
+app.post(  "/api/drugs",      protect, restrictTo("admin"), upsertDrug);
+app.get(   "/api/drugs/:id",  protect, restrictTo("admin"), getSingleDrug);
+app.put(   "/api/drugs/:id",  protect, restrictTo("admin"), upsertDrug);
+app.delete("/api/drugs/:id",  protect, restrictTo("admin"), deleteDrug);
 
 // ────────────────────────────────────────────────────────────
 // INVENTORY (Pharmacy)[cite: 8]
 // ────────────────────────────────────────────────────────────
-app.get("/api/inventory/search-catalog", protect, restrictTo("pharmacy"), searchMasterCatalog);
-app.get("/api/inventory", protect, restrictTo("pharmacy"), getMyInventory);
-app.get("/api/inventory/item/:drugId", protect, restrictTo("pharmacy"), getInventoryItem);
-app.patch("/api/inventory/update", protect, restrictTo("pharmacy"), updateItem);
+app.get( "/api/inventory/search-catalog", protect, restrictTo("pharmacy"), searchMasterCatalog);
+app.get( "/api/inventory",                protect, restrictTo("pharmacy"), getMyInventory);
+app.get( "/api/inventory/item/:drugId",   protect, restrictTo("pharmacy"), getInventoryItem);
+app.patch( "/api/inventory/update",       protect, restrictTo("pharmacy"), updateItem);
 
 // ────────────────────────────────────────────────────────────
 // Error Handling[cite: 8]
