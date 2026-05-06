@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pharmacy Inventory Tester</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f4f4f9;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        input,
+        button {
+            padding: 10px;
+            margin: 5px 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        pre {
+            background: #222;
+            color: #0f0;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            max-height: 300px;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #333;
+            font-size: 1.2rem;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>💊 Pharmacy Inventory API Tester</h1>
+    <p><strong>Note:</strong> Make sure your backend is running on <code>http://localhost:5000</code>.</p>
+
+    <div class="container">
+        <div class="card">
+            <h2>1. Login (Get Auth Token)</h2>
+            <input type="email" id="email" placeholder="Pharmacy Email" value="test@pharmacy.com">
+            <input type="password" id="password" placeholder="Password" value="password123">
+            <button onclick="login()">Login</button>
+            <small>Token is automatically saved for future requests.</small>
+        </div>
+
+        <div class="card">
+            <h2>2. Search Master Catalog</h2>
+            <input type="text" id="searchQuery" placeholder="e.g., Amoxicillin">
+            <button onclick="searchCatalog()">Search Drugs</button>
+        </div>
+
+        <div class="card">
+            <h2>3. Get My Inventory</h2>
+            <button onclick="getMyInventory()">Fetch My Stock</button>
+        </div>
+
+        <div class="card">
+            <h2>4. Update Single Item</h2>
+            <input type="text" id="drugId" placeholder="Paste a valid Drug ID here">
+            <input type="number" id="qty" placeholder="Stock Quantity" value="50">
+            <input type="number" id="price" placeholder="Price" value="12.99" step="0.01">
+            <input type="text" id="notes" placeholder="Notes (e.g., First Batch)">
+            <button onclick="updateItem()">Save / Update Item</button>
+        </div>
+
+        <div class="card">
+            <h2>5. Bulk Upload (CSV)</h2>
+            <input type="file" id="csvFile" accept=".csv">
+            <button onclick="uploadBulk()">Upload CSV</button>
+        </div>
+
+        <div class="card" style="grid-column: span 2;">
+            <h2>🖥️ API Response Output</h2>
+            <pre id="output">Waiting for action...</pre>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "http://localhost:5000/api";
+        let authToken = "";
+
+        // Helper function to print to our custom console
+        function printOutput(data) {
+            document.getElementById("output").textContent = JSON.stringify(data, null, 2);
+        }
+
+        // Helper function to get headers
+        function getHeaders(isFormData = false) {
+            const headers = {};
+            if (!isFormData) headers["Content-Type"] = "application/json";
+
+            // Depending on how your protect middleware works, you might need "Bearer " 
+            if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+            return headers;
+        }
+
+        // 1. LOGIN
+        async function login() {
+            const email = document.getElementById("email").value;
+            const password = document.getElementById("password").value;
+            try {
+                const res = await fetch(`${API_BASE}/pharmacy/login`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ pharmacyEmail: email, password: password })
+                });
+                const data = await res.json();
+
+                // 🎯 THE FIX: Explicitly target data.data.accessToken
+                if (data.success && data.data && data.data.accessToken) {
+                    authToken = data.data.accessToken;
+                    alert("Logged in successfully! Token saved to memory.");
+                } else {
+                    alert("Login failed or token missing.");
+                }
+
+                printOutput(data);
+            } catch (err) { printOutput({ error: err.message }); }
+        }
+
+        // 2. SEARCH CATALOG
+        async function searchCatalog() {
+            const query = document.getElementById("searchQuery").value;
+            try {
+                const res = await fetch(`${API_BASE}/inventory/search-catalog?query=${query}`, {
+                    headers: getHeaders()
+                });
+                printOutput(await res.json());
+            } catch (err) { printOutput({ error: err.message }); }
+        }
+
+        // 3. GET INVENTORY
+        async function getMyInventory() {
+            try {
+                const res = await fetch(`${API_BASE}/inventory`, {
+                    headers: getHeaders()
+                });
+                printOutput(await res.json());
+            } catch (err) { printOutput({ error: err.message }); }
+        }
+
+        // 4. UPDATE ITEM
+        async function updateItem() {
+            const body = {
+                drugId: document.getElementById("drugId").value,
+                stockQuantity: Number(document.getElementById("qty").value),
+                price: Number(document.getElementById("price").value),
+                notes: document.getElementById("notes").value
+            };
+            try {
+                const res = await fetch(`${API_BASE}/inventory/update`, {
+                    method: "PATCH",
+                    headers: getHeaders(),
+                    body: JSON.stringify(body)
+                });
+                printOutput(await res.json());
+            } catch (err) { printOutput({ error: err.message }); }
+        }
+
+        // 5. BULK UPLOAD
+        async function uploadBulk() {
+            const fileInput = document.getElementById("csvFile");
+            if (!fileInput.files[0]) return alert("Please select a CSV file first.");
+
+            const formData = new FormData();
+            // "file" MUST match the name in upload.single("file") in app.js
+            formData.append("file", fileInput.files[0]);
+
+            try {
+                const res = await fetch(`${API_BASE}/inventory/bulk-upload`, {
+                    method: "POST",
+                    headers: getHeaders(true), // true = don't set Content-Type, let browser handle boundary
+                    body: formData
+                });
+                printOutput(await res.json());
+            } catch (err) { printOutput({ error: err.message }); }
+        }
+    </script>
+</body>
+
+</html>

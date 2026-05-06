@@ -4,6 +4,8 @@ const mongoose = require("mongoose");
 const cors     = require("cors");
 const helmet   = require("helmet"); // For setting secure HTTP headers[cite: 8]
 const morgan   = require("morgan"); // For logging HTTP requests[cite: 8]
+const multer = require("multer");
+const upload = multer({ dest: "uploads/" });
 
 // ── Controllers ──────────────────────────────────────────────[cite: 8]
 const {
@@ -46,7 +48,8 @@ const {
   searchMasterCatalog,
   getMyInventory,
   getInventoryItem,
-  updateItem
+  updateItem,
+  bulkUpload
 } = require("./controllers/inventorycontroller");
 
 const { getAlternatives } = require("./controllers/alternativecontroller");
@@ -138,6 +141,8 @@ app.get( "/api/inventory/search-catalog", protect, restrictTo("pharmacy"), searc
 app.get( "/api/inventory",                protect, restrictTo("pharmacy"), getMyInventory);
 app.get( "/api/inventory/item/:drugId",   protect, restrictTo("pharmacy"), getInventoryItem);
 app.patch( "/api/inventory/update",       protect, restrictTo("pharmacy"), updateItem);
+app.post("/api/inventory/bulk-upload", protect, restrictTo("pharmacy"), upload.single("file"), bulkUpload);
+
 
 // ────────────────────────────────────────────────────────────
 // Error Handling[cite: 8]
