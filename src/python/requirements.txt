@@ -12,3 +12,4 @@ pymongo
 pydantic
 xgboost
 joblib
+pandas
