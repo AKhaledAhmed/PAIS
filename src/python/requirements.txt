@@ -10,3 +10,5 @@ sentence-transformers
 torch
 pymongo
 pydantic
+xgboost
+joblib

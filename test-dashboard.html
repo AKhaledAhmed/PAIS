@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PAIS Full System Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style> body { background: #0f172a; color: #f8fafc; } .card { background: #1e293b; padding: 20px; border-radius: 12px; } </style>
+</head>
+<body class="p-10">
+    <div class="max-w-6xl mx-auto space-y-6">
+        <div class="flex justify-between items-center">
+            <h1 class="text-2xl font-bold">PAIS <span class="text-blue-500">Live Integration Test</span></h1>
+            <div class="flex gap-4">
+                <input id="tokenInput" type="password" placeholder="Paste Pharmacy JWT Token" class="bg-slate-800 border border-slate-700 px-4 py-2 rounded text-sm w-64">
+                <button onclick="runFullTest()" class="bg-blue-600 px-6 py-2 rounded font-bold hover:bg-blue-500">Run Test</button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="card">
+                <h2 class="font-bold mb-4">Demand Heatmap (Python AI)</h2>
+                <div id="map" style="height: 300px;" class="rounded"></div>
+            </div>
+            <div class="card">
+                <h2 class="font-bold mb-4">Inventory Forecasting (XGBoost)</h2>
+                <canvas id="forecastChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="font-bold mb-4 text-red-400">System Logs</h2>
+            <div id="logOutput" class="font-mono text-xs bg-black p-4 rounded h-48 overflow-y-auto text-green-400">
+                Waiting for test...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let map = L.map('map').setView([30.0444, 31.2357], 12);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+        let forecastChart;
+
+        async function runFullTest() {
+            const token = document.getElementById('tokenInput').value;
+            const log = document.getElementById('logOutput');
+            log.innerHTML = "> Starting request to Node.js (Port 5000)...\n";
+
+            try {
+                const res = await fetch('http://localhost:5000/api/dashboard', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await res.json();
+
+                if (!result.success) throw new Error(result.message);
+
+                log.innerHTML += `✅ Node.js Connected\n✅ Python AI Status: ${result.data.stats.aiStatus}\n`;
+                
+                // Update Heatmap
+                result.data.heatmap.forEach(p => {
+                    L.circle([p._id.lat, p._id.lng], { color: 'red', radius: 200 }).addTo(map);
+                });
+                log.innerHTML += `✅ Heatmap Rendered: ${result.data.heatmap.length} points\n`;
+
+                // Update Chart
+                const ctx = document.getElementById('forecastChart');
+                if (forecastChart) forecastChart.destroy();
+                forecastChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: result.data.predictions.map(p => "Drug ID: " + p.drugId.slice(-4)),
+                        datasets: [{ label: 'Demand', data: result.data.predictions.map(p => p.expected_demand), backgroundColor: '#3b82f6' }]
+                    }
+                });
+                log.innerHTML += `✅ Forecast Chart Updated\n`;
+
+            } catch (err) {
+                log.innerHTML += `❌ ERROR: ${err.message}\n`;
+            }
+        }
+    </script>
+</body>
+</html>

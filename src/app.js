@@ -43,6 +43,10 @@ const {
 
 const { getMyNotifications, markAsRead } = require("./controllers/notificationcontroller");
 
+const { getPharmacyDashboard} = require("./controllers/dashboardcontroller");
+
+const { initAutoRetrain } = require("./services/schedulerService");
+
 // ────────────────────────────────────────────────────────────
 // 2. Middleware & Utils
 // ────────────────────────────────────────────────────────────
@@ -59,7 +63,13 @@ const app = express();
 // 3. Global Middleware
 // ────────────────────────────────────────────────────────────
 app.use(helmet());
-app.use(cors({ origin: process.env.CLIENT_ORIGIN || "*", credentials: true }));
+// Replace your existing app.use(cors(...)) block with this
+app.use(cors({
+  origin: '*',
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -132,6 +142,11 @@ app.patch("/api/inventory/update", protect, restrictTo("pharmacy"), updateItem);
 app.post("/api/inventory/bulk-upload", protect, restrictTo("pharmacy"), upload.single("file"), bulkUpload);
 
 //-────────────────────────────────────────────────────────────
+// --- Pharmacy Dashboard (AI Powered) ---
+//-────────────────────────────────────────────────────────────
+app.get("/api/dashboard", protect, restrictTo("pharmacy"), getPharmacyDashboard);
+
+//-────────────────────────────────────────────────────────────
 // --- Notifications ---
 //-────────────────────────────────────────────────────────────
 app.get("/api/notifications", protect, getMyNotifications);
@@ -148,12 +163,14 @@ app.use((err, req, res, next) => {
   });
 });
 
+
 //-──────────────────────────────────────────────────────────────
 // 6. Start Server & Connect to DB
 // ─────────────────────────────────────────────────────────────
 mongoose.connect(process.env.MONGO_URI).then(() => {
   console.log("✅ MongoDB Connected");
-  const PORT = process.env.PORT || 5000;
+  const PORT = process.env.NODE_PORT || 3000;
+  initAutoRetrain();
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`🚀 API Server running on port ${PORT}`);
   });
