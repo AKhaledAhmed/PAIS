@@ -114,7 +114,6 @@ async def train_model():
 # ────────────────────────────────────────────────────────────
 # Initialize cache at the global level
 cache = {}
-
 @app.get("/model/predict/{pharmacy_id}")
 async def predict_demand(pharmacy_id: str):
     # 1. Model Check
