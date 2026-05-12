@@ -75,6 +75,79 @@ async def delete_drug(drug_id: str):
         return {"success": True}
     except: raise HTTPException(status_code=400, detail="Invalid ID")
 
+# --- GLOBAL VECTOR CACHE ---
+# This holds the embeddings in RAM so we never have to wait for MongoDB
+DRUG_VECTOR_CACHE = None 
+
+async def refresh_vector_cache():
+    """Call this to load all embeddings into memory."""
+    global DRUG_VECTOR_CACHE
+    print("🚀 Loading drug vectors into RAM...")
+    cursor = collection.find({"embedding": {"$exists": True, "$ne": []}}, {"embedding": 1})
+    data = await cursor.to_list(length=None)
+    # Store as a dictionary for fast lookup: { "id": tensor_vector }
+    DRUG_VECTOR_CACHE = {str(d["_id"]): torch.tensor(d["embedding"]) for d in data}
+    print(f"✅ Cached {len(DRUG_VECTOR_CACHE)} vectors.")
+
+@app.on_event("startup")
+async def startup_event():
+    await refresh_vector_cache()
+
+# ────────────────────────────────────────────────────────────
+# THE ULTIMATE ALTERNATIVES ENDPOINT
+# ────────────────────────────────────────────────────────────
+
+@app.get("/drugs-alternatives/{drug_id}/")
+async def get_alternatives(drug_id: str, top_k: int = 5):
+    if not DRUG_VECTOR_CACHE:
+        await refresh_vector_cache()
+
+    try:
+        oid = ObjectId(drug_id)
+    except InvalidId:
+        raise HTTPException(status_code=400, detail="Invalid ID")
+
+    # 1. Get target vector from CACHE (Instant)
+    target_vector = DRUG_VECTOR_CACHE.get(drug_id)
+    
+    # If not in cache, try fetching from DB and updating cache
+    if target_vector is None:
+        target_drug = await collection.find_one({"_id": oid}, {"embedding": 1})
+        if not target_drug: raise HTTPException(status_code=404, detail="Not found")
+        target_vector = torch.tensor(target_drug["embedding"])
+        DRUG_VECTOR_CACHE[drug_id] = target_vector
+
+    # 2. Perform math against the ENTIRE CACHE at once (CPU speed)
+    # We create a single matrix from the cache
+    ids = list(DRUG_VECTOR_CACHE.keys())
+    vectors = torch.stack(list(DRUG_VECTOR_CACHE.values()))
+    
+    cos_scores = util.cos_sim(target_vector, vectors)[0]
+
+    # 3. Filter indices
+    results = []
+    for i, score in enumerate(cos_scores):
+        s_val = float(score)
+        if s_val >= 0.70 and ids[i] != drug_id:
+            results.append({"id": ids[i], "score": s_val})
+
+    # 4. Sort and fetch ONLY the final winners
+    results.sort(key=lambda x: x["score"], reverse=True)
+    top_results = results[:top_k]
+    
+    final_ids = [ObjectId(r["id"]) for r in top_results]
+    final_drugs = await collection.find({"_id": {"$in": final_ids}}).to_list(None)
+
+    # 5. Attach scores and cleanup
+    score_map = {r["id"]: r["score"] for r in top_results}
+    output = []
+    for doc in final_drugs:
+        doc["_id"] = str(doc["_id"])
+        doc["score"] = round(score_map[doc["_id"]] * 100, 2)
+        if "embedding" in doc: del doc["embedding"]
+        output.append(doc)
+
+    return sorted(output, key=lambda x: x["score"], reverse=True)
 # ────────────────────────────────────────────────────────────
 # AI TRAINING (XGBOOST)
 # ────────────────────────────────────────────────────────────
@@ -108,6 +181,7 @@ async def train_model():
     joblib.dump(new_model, MODEL_PATH)
     xgb_model = new_model # Update the live memory cache immediately
     return {"status": "Success", "samples": len(train_df)}
+
 
 # ────────────────────────────────────────────────────────────
 # OPTIMIZED ANALYTICS & PREDICTIONS
