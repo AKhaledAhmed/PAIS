@@ -301,7 +301,7 @@
 
 
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -310,6 +310,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import AuthFormLogo from '../../Components/AuthFormLogo/AuthFormLogo';
 
+const GEOAPIFY_API_KEY = 'd5861ea96e564d92aa4f3eb9af59c183'; // 🔑 Replace with your key
 
 const registerSchema = z.object({
   role: z.enum(['client', 'pharmacy']),
@@ -322,15 +323,14 @@ const registerSchema = z.object({
   phone: z.string().optional(),
   dateOfBirth: z.string().optional(),
   gender: z.any().optional(),
-
- 
   pharmacyName: z.string().optional(),
   ownerName: z.string().optional(),
   location: z.string().optional(),
   licenseId: z.string().optional(),
   pharmacyEmail: z.string().email("Invalid email").optional(),
   pharmacyPhone: z.string().optional(),
-  
+  lat: z.string().optional(),
+  lng: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match",
   path: ["confirmPassword"],
@@ -338,13 +338,90 @@ const registerSchema = z.object({
 
 export default function Register() {
   const navigate = useNavigate();
-  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm({
-     resolver: zodResolver(registerSchema),
+
+  // ── Autocomplete state ──────────────────────────────────────────────
+  const [suggestions, setSuggestions] = useState([]);
+  const [locationInput, setLocationInput] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const debounceRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,                      // ← needed to set lat/lng/location
+    formState: { errors, isSubmitting }
+  } = useForm({
+    resolver: zodResolver(registerSchema),
     defaultValues: { role: 'client', gender: "true" }
   });
 
   const selectedRole = watch('role');
 
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Fetch suggestions with debounce (300ms)
+  const handleLocationChange = (e) => {
+    const value = e.target.value;
+    setLocationInput(value);
+    setValue('location', value); // keep RHF in sync while typing
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (value.length < 3) {
+      setSuggestions([]);
+      setShowDropdown(false);
+      return;
+    }
+
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await axios.get(
+          `https://api.geoapify.com/v1/geocode/autocomplete`,
+          {
+            params: {
+              text: value,
+              apiKey: GEOAPIFY_API_KEY,
+              limit: 5,
+              format: 'json',
+            },
+          }
+        );
+        const results = res.data.results || [];
+        setSuggestions(results);
+        setShowDropdown(results.length > 0);
+      } catch {
+        setSuggestions([]);
+      }
+    }, 300);
+  };
+
+  // Fill all three fields when user picks a suggestion
+  const handleSelectSuggestion = (place) => {
+    const address = place.formatted;
+    const lat = place.lat?.toString() ?? '';
+    const lon = place.lon?.toString() ?? '';
+
+    setLocationInput(address);
+    setValue('location', address);
+    setValue('lat', lat);
+    setValue('lng', lon);
+
+    setSuggestions([]);
+    setShowDropdown(false);
+  };
+
+  // ── Submit ──────────────────────────────────────────────────────────
   const onSubmit = async (data) => {
     try {
       let endpoint = '';
@@ -361,7 +438,7 @@ export default function Register() {
           gender: data.gender === "true",
           password: data.password,
           confirmPassword: data.confirmPassword,
-          acceptedTerms: data.acceptedTerms
+          acceptedTerms: data.acceptedTerms,
         };
       } else {
         endpoint = 'https://pais-production.up.railway.app/api/pharmacy/register';
@@ -369,20 +446,21 @@ export default function Register() {
           pharmacyName: data.pharmacyName,
           ownerName: data.ownerName,
           location: data.location,
+          address: data.location,
           licenseId: data.licenseId,
           pharmacyEmail: data.pharmacyEmail,
           pharmacyPhone: data.pharmacyPhone,
           password: data.password,
           confirmPassword: data.confirmPassword,
           acceptedTerms: data.acceptedTerms,
-           address: data.location 
+          lat: parseFloat(data.lat),
+          lng: parseFloat(data.lng),
         };
       }
 
       const response = await axios.post(endpoint, payload);
-      
       if (response.data.success) {
-       toast.success("Registration Successful!");
+        toast.success("Registration Successful!");
         navigate('/login');
       }
     } catch (error) {
@@ -397,43 +475,22 @@ export default function Register() {
         <h2 className="text-3xl font-bold text-cyan-900 text-center mb-2">Create Account</h2>
         <p className="text-center text-gray-500 mb-8">Join the PAIS Pharmaceutical Network</p>
 
-       
-<div className="flex p-1 bg-gray-100 rounded-2xl mb-8 w-64 mx-auto">
-  
-  <label 
-    className={`flex-1 text-center py-2 rounded-xl text-sm font-bold cursor-pointer transition-all ${
-      selectedRole === 'client' ? 'bg-cyan-900 text-white shadow' : 'text-gray-500'
-    }`}
-  >
-    <input 
-      type="radio" 
-      {...register('role')} 
-      value="client" 
-      className="hidden" 
-    />
-    Client
-  </label>
-
- 
-  <label 
-    className={`flex-1 text-center py-2 rounded-xl text-sm font-bold cursor-pointer transition-all ${
-      selectedRole === 'pharmacy' ? 'bg-cyan-900 text-white shadow' : 'text-gray-500'
-    }`}
-  >
-    <input 
-      type="radio" 
-      {...register('role')} 
-      value="pharmacy" 
-      className="hidden" 
-    />
-    Pharmacy
-  </label>
-</div>
+        {/* Role Toggle */}
+        <div className="flex p-1 bg-gray-100 rounded-2xl mb-8 w-64 mx-auto">
+          <label className={`flex-1 text-center py-2 rounded-xl text-sm font-bold cursor-pointer transition-all ${selectedRole === 'client' ? 'bg-cyan-900 text-white shadow' : 'text-gray-500'}`}>
+            <input type="radio" {...register('role')} value="client" className="hidden" />
+            Client
+          </label>
+          <label className={`flex-1 text-center py-2 rounded-xl text-sm font-bold cursor-pointer transition-all ${selectedRole === 'pharmacy' ? 'bg-cyan-900 text-white shadow' : 'text-gray-500'}`}>
+            <input type="radio" {...register('role')} value="pharmacy" className="hidden" />
+            Pharmacy
+          </label>
+        </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            
-            
+
+            {/* ── Client Fields ── */}
             {selectedRole === 'client' && (
               <>
                 <div className="flex flex-col">
@@ -466,7 +523,7 @@ export default function Register() {
               </>
             )}
 
-           
+            {/* ── Pharmacy Fields ── */}
             {selectedRole === 'pharmacy' && (
               <>
                 <div className="flex flex-col">
@@ -477,10 +534,34 @@ export default function Register() {
                   <label className="text-sm font-semibold text-gray-600 mb-1">Owner Name</label>
                   <input {...register('ownerName')} className="p-3 bg-gray-50 border rounded-xl outline-cyan-600" placeholder="Mohamed Ali" />
                 </div>
-                <div className="flex flex-col md:col-span-2">
+
+                {/* ── Location Autocomplete ── */}
+                <div className="flex flex-col md:col-span-2 relative" ref={dropdownRef}>
                   <label className="text-sm font-semibold text-gray-600 mb-1">Location Address</label>
-                  <input {...register('location')} className="p-3 bg-gray-50 border rounded-xl outline-cyan-600" placeholder="12 Tahrir Square, Cairo" />
+                  <input
+                    type="text"
+                    value={locationInput}
+                    onChange={handleLocationChange}
+                    onFocus={() => suggestions.length > 0 && setShowDropdown(true)}
+                    className="p-3 bg-gray-50 border rounded-xl outline-cyan-600"
+                    placeholder="Start typing an address..."
+                    autoComplete="off"
+                  />
+                  {showDropdown && (
+                    <ul className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
+                      {suggestions.map((place, index) => (
+                        <li
+                          key={index}
+                          onClick={() => handleSelectSuggestion(place)}
+                          className="px-4 py-3 text-sm text-gray-700 hover:bg-cyan-50 hover:text-cyan-900 cursor-pointer border-b last:border-b-0 transition-colors"
+                        >
+                          📍 {place.formatted}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
+
                 <div className="flex flex-col">
                   <label className="text-sm font-semibold text-gray-600 mb-1">License ID</label>
                   <input {...register('licenseId')} className="p-3 bg-gray-50 border rounded-xl outline-cyan-600" placeholder="LIC-2024-XXXX" />
@@ -493,20 +574,32 @@ export default function Register() {
                   <label className="text-sm font-semibold text-gray-600 mb-1">Pharmacy Phone</label>
                   <input {...register('pharmacyPhone')} className="p-3 bg-gray-50 border rounded-xl outline-cyan-600" placeholder="+202..." />
                 </div>
+
+                {/* Lat / Lng — auto-filled, but editable */}
                 <div className="grid grid-cols-2 gap-2">
-                   <div className="flex flex-col">
-                      <label className="text-xs font-semibold text-gray-600">Latitude</label>
-                      <input {...register('lat')} className="p-3 bg-gray-50 border rounded-xl outline-cyan-600" placeholder="30.04" />
-                   </div>
-                   <div className="flex flex-col">
-                      <label className="text-xs font-semibold text-gray-600">Longitude</label>
-                      <input {...register('lng')} className="p-3 bg-gray-50 border rounded-xl outline-cyan-600" placeholder="31.23" />
-                   </div>
+                  <div className="flex flex-col">
+                    <label className="text-xs font-semibold text-gray-600">Latitude</label>
+                    <input
+                      {...register('lat')}
+                      className="p-3 bg-gray-50 border rounded-xl outline-cyan-600 text-sm text-gray-500"
+                      placeholder="Auto-filled"
+                      readOnly
+                    />
+                  </div>
+                  <div className="flex flex-col">
+                    <label className="text-xs font-semibold text-gray-600">Longitude</label>
+                    <input
+                      {...register('lng')}
+                      className="p-3 bg-gray-50 border rounded-xl outline-cyan-600 text-sm text-gray-500"
+                      placeholder="Auto-filled"
+                      readOnly
+                    />
+                  </div>
                 </div>
               </>
             )}
 
-            
+            {/* ── Password Fields ── */}
             <div className="flex flex-col">
               <label className="text-sm font-semibold text-gray-600 mb-1">Password</label>
               <input type="password" {...register('password')} className="p-3 bg-gray-50 border rounded-xl outline-cyan-600" />
@@ -525,8 +618,8 @@ export default function Register() {
           </div>
           {errors.acceptedTerms && <p className="text-red-500 text-xs">{errors.acceptedTerms.message}</p>}
 
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             disabled={isSubmitting}
             className="w-full bg-cyan-900 text-white py-4 rounded-2xl font-bold text-lg hover:bg-cyan-950 transition-all shadow-lg disabled:bg-gray-300"
           >
