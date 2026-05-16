@@ -35,6 +35,17 @@ const getPharmacyInventory = async (pharmacyId, searchTerm = "") => {
 const updateInventoryItem = async (pharmacyId, drugId, updateData) => {
   const { stockQuantity, price, notes } = updateData;
 
+  // ── PRICE VALIDATION: Pharmacy price must not exceed the master drug price ──
+  const masterDrug = await Drug.findById(drugId).select("price name");
+  if (!masterDrug) {
+    throw new Error(`Drug with ID ${drugId} does not exist in the master catalog.`);
+  }
+  if (price > masterDrug.price) {
+    throw new Error(
+      `Price for "${masterDrug.name}" cannot exceed the master catalog price of ${masterDrug.price}. Provided: ${price}.`
+    );
+  }
+
   let item = await Inventory.findOne({ pharmacyId, drugId });
   const oldQuantity = item ? item.stockQuantity : 0;
   const oldPrice = item ? item.price : 0;

@@ -13,7 +13,7 @@ const registerPharmacy = async (req, res) => {
     const { 
       pharmacyName, ownerName, address, licenseId, 
       pharmacyPhone, password, pharmacyEmail, 
-      acceptedTerms, lat, lng 
+      acceptedTerms, lat, lng
     } = req.body;
 
     // ── Geocoding Fallback ───────────────────────────────

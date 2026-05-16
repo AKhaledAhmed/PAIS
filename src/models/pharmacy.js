@@ -70,7 +70,7 @@ const pharmacySchema = new mongoose.Schema(
       type: String,
       required: [true, "Pharmacy phone number is required"],
       trim: true,
-      match: [/^\+?[1-9]\d{1,14}$/, "Please enter a valid phone number in E.164 format"],
+      match: [/^\+?[1-9]\d{1,14}$/, "Please enter a valid phone number starting with country code, e.g. +1234567890"],
     },
     // Status managed off-site by admin
     status: {

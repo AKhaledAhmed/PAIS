@@ -60,7 +60,7 @@ const loginClient = async (req, res) => {
     const client = await Client.findOne({ email }).select("+password +refreshTokens");
     
     if (!client || !(await client.comparePassword(password))) {
-      return res.status(401).json({ success: false, message: "Invalid credentials." });
+      return res.status(401).json({ success: false, message: "Invalid email or password." });
     }
 
     const payload = { id: client._id, role: "client" };

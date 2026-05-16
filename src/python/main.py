@@ -75,8 +75,9 @@ async def delete_drug(drug_id: str):
         return {"success": True}
     except: raise HTTPException(status_code=400, detail="Invalid ID")
 
+# ────────────────────────────────────────────────────────────
 # --- GLOBAL VECTOR CACHE ---
-# This holds the embeddings in RAM so we never have to wait for MongoDB
+# This is a RAM-resident dictionary of all drug embeddings for lightning-fast similarity search.
 DRUG_VECTOR_CACHE = None 
 
 async def refresh_vector_cache():

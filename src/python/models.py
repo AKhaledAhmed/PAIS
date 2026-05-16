@@ -13,6 +13,7 @@ class DrugSchema(BaseModel):
     manufacturer: Optional[str] = None
     imageUrl: Optional[str] = None
     isbn: Optional[str] = None
+    price: float = Field(..., gt=0)
     embedding: List[float] = []
 
     class Config:

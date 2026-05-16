@@ -105,7 +105,13 @@ const updateItem = async (req, res) => {
       data: updated 
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: "Failed to update inventory item." });
+    // Service throws meaningful errors for validation failures (price cap, missing drug, etc.)
+    // Forward those as 400 Bad Request instead of masking them as a 500
+    const isValidationError = error.message && !error.message.includes("Failed");
+    res.status(isValidationError ? 400 : 500).json({
+      success: false,
+      error: isValidationError ? error.message : "Failed to update inventory item.",
+    });
   }
 };
 
