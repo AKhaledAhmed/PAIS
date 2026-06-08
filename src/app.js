@@ -171,7 +171,7 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => {
     console.log("✅ MongoDB Connected");
     const PORT = process.env.PORT || 5000;
-    initAutoRetrain();
+    // initAutoRetrain();
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`🚀 API Server running on port ${PORT}`);
     });
