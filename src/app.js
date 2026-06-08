@@ -167,13 +167,19 @@ app.use((err, req, res, next) => {
 //-──────────────────────────────────────────────────────────────
 // 6. Start Server & Connect to DB
 // ─────────────────────────────────────────────────────────────
-mongoose.connect(process.env.MONGO_URI).then(() => {
-  console.log("✅ MongoDB Connected");
-  const PORT = process.env.PORT || 5000;
-  initAutoRetrain();
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`🚀 API Server running on port ${PORT}`);
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => {
+    console.log("✅ MongoDB Connected");
+    const PORT = process.env.PORT || 5000;
+    initAutoRetrain();
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`🚀 API Server running on port ${PORT}`);
+    });
+  })
+  .catch((err) => {
+    // THIS is the crucial part you are missing!
+    console.error("❌ MongoDB Connection Error:", err.message);
+    process.exit(1); 
   });
-});
 
 module.exports = app;
