@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import axios from 'axios'; 
+import axios from 'axios';
 import { useAuth, getDashboardPathForRole } from '../../Context/AuthContext';
 import AuthFormLogo from '../../Components/AuthFormLogo/AuthFormLogo';
 const API_URL = import.meta.env?.VITE_API_URL || process.env.REACT_APP_API_URL || 'http://localhost:5000';
@@ -9,13 +9,13 @@ const API_URL = import.meta.env?.VITE_API_URL || process.env.REACT_APP_API_URL |
 export default function Login() {
   const location = useLocation();
   const from = location.state?.from?.pathname;
-  const { login } = useAuth(); 
+  const { login } = useAuth();
   const navigate = useNavigate();
   const [serverError, setServerError] = useState("");
-  
+
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
     defaultValues: {
-      role: 'client' 
+      role: 'client'
     }
   });
 
@@ -23,7 +23,7 @@ export default function Login() {
     setServerError("");
     try {
       let endpoint = '';
-      
+
       if (data.role === 'admin') {
         endpoint = `${API_URL}/api/admin/login`;
       } else if (data.role === 'pharmacy') {
@@ -41,13 +41,13 @@ export default function Login() {
 
       if (response.data.success) {
         const authData = response.data.data;
-           
+
         // 1. Core Auth State Trigger
         login(authData, data.role);
 
         // 2. Determine target path based on chosen role
         const home = getDashboardPathForRole(data.role);
-        
+
         // 3. FIXED: Wrap navigation in a timeout to prevent race condition with ProtectedRoute
         if (home) {
           setTimeout(() => {
@@ -79,7 +79,7 @@ export default function Login() {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           <div>
             <label className="block mb-1.5 text-sm font-semibold text-gray-700">Identify yourself as:</label>
-            <select 
+            <select
               {...register('role', { required: true })}
               className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:ring-2 focus:ring-cyan-600 outline-none transition-all"
             >
@@ -91,9 +91,9 @@ export default function Login() {
 
           <div>
             <label className="block mb-1.5 text-sm font-semibold text-gray-700">Email Address</label>
-            <input 
-              type="email" 
-              {...register('email', { 
+            <input
+              type="email"
+              {...register('email', {
                 required: "Email is required",
                 pattern: { value: /^\S+@\S+$/i, message: "Invalid email format" }
               })}
@@ -105,8 +105,8 @@ export default function Login() {
 
           <div>
             <label className="block mb-1.5 text-sm font-semibold text-gray-700">Password</label>
-            <input 
-              type="password" 
+            <input
+              type="password"
               {...register('password', { required: "Password is required" })}
               className="w-full p-3 bg-gray-50 rounded-xl border border-gray-200 focus:ring-2 focus:ring-cyan-600 outline-none transition-all"
               placeholder="••••••••"
@@ -114,17 +114,17 @@ export default function Login() {
             {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>}
           </div>
 
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             disabled={isSubmitting}
             className="w-full bg-cyan-900 text-white py-3.5 rounded-xl font-bold hover:bg-cyan-950 transition-all shadow-lg shadow-cyan-100 disabled:bg-gray-400"
           >
             {isSubmitting ? 'Signing in...' : 'Login'}
           </button>
-          
-          <button 
-            type="button" 
-            onClick={() => navigate('/')} 
+
+          <button
+            type="button"
+            onClick={() => navigate('/')}
             className="w-full border-2 border-cyan-900 text-cyan-900 py-3 rounded-xl font-bold hover:bg-cyan-50 transition-all"
           >
             Continue as Guest

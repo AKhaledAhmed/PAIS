@@ -4,8 +4,8 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "start": "node app.js",
-    "dev": "node app.js"
+    "start": "node init && node app.js",
+    "dev": "node init && node app.js"
   },
   "keywords": [],
   "author": "",
